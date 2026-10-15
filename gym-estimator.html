@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gym depth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Big+Shoulders+Display:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --deck:#E9EBE4;
+  --panel:#F3F4EE;
+  --ink:#1C2420;
+  --ink-soft:#5C675F;
+  --ink-faint:#8A948C;
+  --rule:#C9CFC3;
+  --rule-soft:#DCE0D6;
+  --d0:#E2E6DD;
+  --d1:#D1E0D8;
+  --d2:#9FC9BB;
+  --d3:#5FA796;
+  --d4:#2E7D6D;
+  --d5:#16534A;
+  --d6:#0C322D;
+  --on-deep:#EDF3EF;
+  --signal:#C2900F;
+  --signal-bg:#F6E7BC;
+  --closed:#D8D4CC;
+  box-sizing:border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --deck:#121714;
+    --panel:#1A211D;
+    --ink:#E6EBE5;
+    --ink-soft:#9BA79E;
+    --ink-faint:#6B766E;
+    --rule:#2E3833;
+    --rule-soft:#232B27;
+    --d0:#1B2320;
+    --d1:#1F3631;
+    --d2:#255349;
+    --d3:#2F7A6B;
+    --d4:#45A28E;
+    --d5:#6CC7AF;
+    --d6:#9FE5D1;
+    --on-deep:#07110E;
+    --signal:#E8BF52;
+    --signal-bg:#43340D;
+    --closed:#272E2A;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --deck:#121714;
+  --panel:#1A211D;
+  --ink:#E6EBE5;
+  --ink-soft:#9BA79E;
+  --ink-faint:#6B766E;
+  --rule:#2E3833;
+  --rule-soft:#232B27;
+  --d0:#1B2320;
+  --d1:#1F3631;
+  --d2:#255349;
+  --d3:#2F7A6B;
+  --d4:#45A28E;
+  --d5:#6CC7AF;
+  --d6:#9FE5D1;
+  --on-deep:#07110E;
+  --signal:#E8BF52;
+  --signal-bg:#43340D;
+  --closed:#272E2A;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+body{
+  margin:0;
+  background:var(--deck);
+  color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:820px;margin:0 auto;padding:0 20px 72px}
+
+/* ---------- header ---------- */
+.bar{
+  display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding:20px 0 14px;border-bottom:1px solid var(--rule);
+  flex-wrap:wrap;
+}
+.clock{font-weight:600;letter-spacing:-0.01em}
+.clock span{color:var(--ink-faint);font-weight:400}
+.freshness{font-size:13px;color:var(--ink-soft)}
+.freshness b{font-weight:600;color:var(--ink)}
+
+/* ---------- empty state ---------- */
+.empty{padding:56px 0 24px;max-width:52ch}
+.empty h1{
+  font-family:"Big Shoulders Display",Archivo,sans-serif;
+  font-weight:800;font-size:clamp(44px,10vw,76px);line-height:0.92;
+  margin:0 0 18px;letter-spacing:0.005em;
+}
+.empty p{color:var(--ink-soft);margin:0 0 14px}
+.steps{margin:26px 0 0;padding:0;list-style:none;border-top:1px solid var(--rule-soft)}
+.steps li{padding:14px 0;border-bottom:1px solid var(--rule-soft);display:flex;gap:14px;align-items:flex-start}
+.steps .n{
+  font-family:"Big Shoulders Display",sans-serif;font-weight:600;font-size:22px;
+  line-height:1;color:var(--ink-faint);min-width:18px;padding-top:2px;
+}
+
+/* ---------- facility panels ---------- */
+.pools{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--rule);
+  border:1px solid var(--rule);margin:26px 0 0}
+@media (max-width:620px){.pools{grid-template-columns:1fr}}
+.pool{background:var(--panel);padding:20px 20px 18px;min-width:0}
+.pool h2{
+  margin:0;font-size:15px;font-weight:600;letter-spacing:-0.01em;
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.pool h2 em{font-style:normal;font-weight:400;font-size:12.5px;color:var(--ink-faint)}
+.count{
+  font-family:"Big Shoulders Display",Archivo,sans-serif;
+  font-weight:800;font-size:84px;line-height:0.8;letter-spacing:0.01em;
+  margin:18px 0 2px;font-variant-numeric:tabular-nums;
+}
+.count.quiet{color:var(--ink-faint);font-size:46px;line-height:1.1;font-weight:600}
+.cap{font-size:13px;color:var(--ink-soft);margin-bottom:14px}
+.gauge{height:10px;background:var(--d0);position:relative;overflow:hidden}
+.gauge i{display:block;height:100%;background:var(--d4);width:0;transition:width .35s cubic-bezier(.2,.7,.3,1)}
+.gaugerow{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;
+  font-size:12.5px;color:var(--ink-soft);gap:10px}
+.spark{display:block;width:100%;height:46px;margin-top:16px}
+.conf{font-size:12px;color:var(--ink-faint);margin-top:10px;line-height:1.45}
+
+/* ---------- when controls ---------- */
+.when{margin-top:30px;padding-top:22px;border-top:1px solid var(--rule)}
+.whenhead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.whenhead h3{margin:0;font-size:15px;font-weight:600}
+.days{display:flex;gap:1px;background:var(--rule);border:1px solid var(--rule);width:100%}
+.days button{
+  flex:1;appearance:none;border:0;background:var(--panel);color:var(--ink-soft);
+  font:inherit;font-size:13px;font-weight:500;padding:9px 2px;cursor:pointer;min-width:0;
+}
+.days button:hover{background:var(--d1)}
+.days button[aria-pressed="true"]{background:var(--ink);color:var(--deck);font-weight:600}
+.hourline{display:flex;align-items:center;gap:14px;margin-top:16px}
+input[type=range]{flex:1;accent-color:var(--d4);min-width:0}
+.hourval{
+  font-family:"Big Shoulders Display",sans-serif;font-weight:600;font-size:26px;
+  min-width:86px;text-align:right;font-variant-numeric:tabular-nums;line-height:1;
+}
+.nowbtn{
+  appearance:none;border:1px solid var(--rule);background:transparent;color:var(--ink);
+  font:inherit;font-size:13px;font-weight:500;padding:6px 12px;cursor:pointer;
+}
+.nowbtn:hover{background:var(--panel)}
+.nowbtn[aria-pressed="true"]{background:var(--signal-bg);border-color:var(--signal);color:var(--ink)}
+
+/* ---------- week grid ---------- */
+.week{margin-top:34px;padding-top:22px;border-top:1px solid var(--rule)}
+.week h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.week .hint{margin:0 0 18px;font-size:13px;color:var(--ink-soft);max-width:60ch}
+.grid{margin-bottom:26px}
+.gridname{font-size:13px;font-weight:600;margin-bottom:7px}
+.gridscroll{overflow-x:auto;padding-bottom:4px}
+table.heat{border-collapse:separate;border-spacing:1px;background:var(--rule-soft);min-width:560px;width:100%}
+table.heat th{
+  font-weight:500;font-size:11px;color:var(--ink-faint);background:var(--deck);
+  padding:2px 4px;text-align:left;white-space:nowrap;
+}
+table.heat th.rowh{text-align:right;padding-right:7px;width:34px}
+table.heat td{padding:0;height:19px;background:var(--d0);position:relative}
+table.heat td.has{cursor:default}
+table.heat td.now{box-shadow:inset 0 0 0 2px var(--signal)}
+.legend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);margin-top:-12px;flex-wrap:wrap}
+.legend .swatches{display:flex;gap:2px}
+.legend .swatches i{width:17px;height:11px;display:block}
+.legend .nowkey{display:inline-flex;align-items:center;gap:5px}
+.legend .nowkey i{width:11px;height:11px;box-shadow:inset 0 0 0 2px var(--signal);background:var(--d0)}
+
+/* ---------- ask ---------- */
+.ask{margin-top:34px;padding-top:22px;border-top:1px solid var(--rule)}
+.ask h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.ask .hint{margin:0 0 14px;font-size:13px;color:var(--ink-soft);max-width:60ch}
+.askrow{display:flex;gap:10px;flex-wrap:wrap}
+.askrow input{
+  flex:1;min-width:200px;font:inherit;padding:10px 12px;background:var(--panel);
+  color:var(--ink);border:1px solid var(--rule);
+}
+.askrow input:focus-visible{outline:2px solid var(--d4);outline-offset:-1px}
+.go{
+  appearance:none;border:0;background:var(--ink);color:var(--deck);font:inherit;
+  font-weight:600;padding:10px 20px;cursor:pointer;
+}
+.go:disabled{opacity:.45;cursor:default}
+.answer{margin-top:16px;padding:16px 18px;background:var(--panel);border-left:3px solid var(--d4);
+  white-space:pre-wrap;font-size:14.5px;line-height:1.6;max-width:70ch}
+.answer:empty{display:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.chips button{
+  appearance:none;border:1px solid var(--rule);background:transparent;color:var(--ink-soft);
+  font:inherit;font-size:12.5px;padding:5px 11px;cursor:pointer;
+}
+.chips button:hover{background:var(--panel);color:var(--ink)}
+
+/* ---------- data ---------- */
+.data{margin-top:34px;padding-top:22px;border-top:1px solid var(--rule)}
+.data h3{margin:0 0 4px;font-size:15px;font-weight:600}
+.data .hint{margin:0 0 16px;font-size:13px;color:var(--ink-soft);max-width:64ch}
+.data a{color:var(--ink);text-decoration-color:var(--d3);text-underline-offset:3px}
+.drop{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filebtn{
+  appearance:none;border:1px solid var(--ink);background:transparent;color:var(--ink);
+  font:inherit;font-weight:600;font-size:14px;padding:9px 18px;cursor:pointer;
+}
+.filebtn:hover{background:var(--panel)}
+.filebtn.primary{background:var(--ink);color:var(--deck);border-color:var(--ink)}
+textarea{
+  width:100%;min-height:92px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12px;padding:11px;background:var(--panel);color:var(--ink);
+  border:1px solid var(--rule);resize:vertical;
+}
+textarea:focus-visible{outline:2px solid var(--d4);outline-offset:-1px}
+.status{font-size:13px;margin-top:12px;color:var(--ink-soft)}
+.status.bad{color:var(--signal)}
+details.paste{margin-top:6px}
+details.paste summary{cursor:pointer;font-size:13px;color:var(--ink-soft);padding:4px 0}
+details.paste summary:hover{color:var(--ink)}
+details.paste > div{margin-top:10px}
+.hidden{display:none !important}
+:focus-visible{outline:2px solid var(--d4);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="bar">
+    <div class="clock" id="clock">—</div>
+    <div class="freshness" id="freshness"></div>
+  </div>
+
+  <!-- empty state -->
+  <section class="empty" id="empty">
+    <h1>How deep is<br>the crowd?</h1>
+    <p>This reads the history your tracker has been collecting and estimates how many people are in each fitness center at a given hour. It can't reach GitHub on its own, so hand it the file once and it'll remember.</p>
+    <ol class="steps">
+      <li><span class="n">1</span><span>Open <a href="https://raw.githubusercontent.com/allmankm/gym-tracker/main/data/counts.csv" target="_blank" rel="noopener">counts.csv</a> and save it, or select all and copy.</span></li>
+      <li><span class="n">2</span><span>Load it below. It stays in this browser, so next time the page opens straight to the estimate.</span></li>
+    </ol>
+  </section>
+
+  <!-- estimates -->
+  <section id="main" class="hidden">
+
+    <div class="pools" id="pools"></div>
+
+    <section class="when">
+      <div class="whenhead">
+        <h3 id="whenhead">Estimating for right now</h3>
+        <button class="nowbtn" id="nowbtn" aria-pressed="true">Back to now</button>
+      </div>
+      <div class="days" id="days"></div>
+      <div class="hourline">
+        <input type="range" id="hour" min="0" max="23" step="1" aria-label="Hour of day">
+        <div class="hourval" id="hourval">—</div>
+      </div>
+    </section>
+
+    <section class="week">
+      <h3>The shape of a week</h3>
+      <p class="hint">Average count in each hour the tracker has a reading for. Blank squares are hours it hasn't seen yet.</p>
+      <div id="heatmaps"></div>
+      <div class="legend">
+        <span>Quiet</span>
+        <span class="swatches"><i style="background:var(--d1)"></i><i style="background:var(--d2)"></i><i style="background:var(--d3)"></i><i style="background:var(--d4)"></i><i style="background:var(--d5)"></i><i style="background:var(--d6)"></i></span>
+        <span>Packed</span>
+        <span class="nowkey"><i></i> now</span>
+      </div>
+    </section>
+
+    <section class="ask hidden" id="ask">
+      <h3>Ask about the pattern</h3>
+      <p class="hint">Claude gets the hour-by-hour averages below and nothing else, so keep questions to what the data can answer.</p>
+      <div class="askrow">
+        <input id="q" placeholder="Estimate current facility counts" autocomplete="off">
+        <button class="go" id="goask">Ask</button>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="answer" id="answer"></div>
+    </section>
+
+  </section>
+
+  <!-- data panel -->
+  <section class="data">
+    <h3 id="datah">Load your data</h3>
+    <p class="hint">Pull a fresh copy of <a href="https://raw.githubusercontent.com/allmankm/gym-tracker/main/data/counts.csv" target="_blank" rel="noopener">counts.csv</a> whenever you want the estimate to include recent readings.</p>
+    <div class="drop">
+      <button class="filebtn primary" id="pick">Choose counts.csv</button>
+      <button class="filebtn hidden" id="clear">Forget this data</button>
+    </div>
+    <input type="file" id="file" accept=".csv,text/csv" class="hidden">
+    <details class="paste">
+      <summary>or paste the file contents</summary>
+      <div>
+        <textarea id="paste" placeholder="checked_at,day_of_week,hour,facility,status,last_count,…" spellcheck="false"></textarea>
+        <div style="margin-top:10px"><button class="filebtn" id="usepaste">Use pasted data</button></div>
+      </div>
+    </details>
+    <div class="status" id="status"></div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var KEY = "gymdepth.csv.v1";
+var DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+var DAYS_SHORT = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+var rows = [];        // parsed readings
+var facilities = [];  // {name, short, capacity}
+var buckets = {};     // facility -> dow -> hour -> {sum,n,min,max,closed,open}
+var maxAvg = 1;
+var sel = { day: null, hour: null, pinned: false };
+var lastLoaded = null;
+
+/* ---------- storage ---------- */
+function store(text){
+  try{ localStorage.setItem(KEY, JSON.stringify({csv:text, at:Date.now()})); }
+  catch(e){ /* quota or blocked; data still works this session */ }
+}
+function restore(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return null;
+    var o = JSON.parse(raw);
+    if(o && typeof o.csv === "string") return o;
+  }catch(e){}
+  return null;
+}
+function forget(){ try{ localStorage.removeItem(KEY); }catch(e){} }
+
+/* ---------- csv ---------- */
+function parseCSV(text){
+  var out=[], row=[], cur="", q=false, i=0, c;
+  text = text.replace(/^\uFEFF/,"");
+  for(i=0;i<text.length;i++){
+    c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1] === '"'){ cur+='"'; i++; } else q=false; }
+      else cur += c;
+    } else if(c === '"'){ q=true; }
+    else if(c === ','){ row.push(cur); cur=""; }
+    else if(c === '\n'){ row.push(cur); out.push(row); row=[]; cur=""; }
+    else if(c === '\r'){ /* skip */ }
+    else cur += c;
+  }
+  if(cur.length || row.length){ row.push(cur); out.push(row); }
+  return out.filter(function(r){ return r.length>1 || (r[0]||"").trim()!==""; });
+}
+
+// "10/14/2026 06:45 PM" -> {dow, hour, date}
+function parseUpdated(s){
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i.exec(String(s).trim());
+  if(!m) return null;
+  var h = parseInt(m[4],10);
+  if(m[7]){ h = h%12; if(/pm/i.test(m[7])) h += 12; }
+  var d = new Date(parseInt(m[3],10), parseInt(m[1],10)-1, parseInt(m[2],10), h, parseInt(m[5],10));
+  if(isNaN(d.getTime())) return null;
+  return { date:d, hour:d.getHours(), dow:(d.getDay()+6)%7 };
+}
+
+function ingest(text){
+  var table = parseCSV(text);
+  if(table.length < 2) throw new Error("That file has no rows in it.");
+  var head = table[0].map(function(h){ return h.trim().toLowerCase(); });
+  var ix = {};
+  head.forEach(function(h,i){ ix[h]=i; });
+  if(!("facility" in ix) || !("last_count" in ix)){
+    throw new Error("That doesn't look like counts.csv — no facility or last_count column.");
+  }
+  var out=[], facMap={};
+  for(var r=1;r<table.length;r++){
+    var t = table[r];
+    if(t.length < head.length - 1) continue;
+    var fac = (t[ix.facility]||"").trim();
+    if(!fac) continue;
+    var count = parseInt(t[ix.last_count],10);
+    var cap = parseInt(t[ix.capacity],10);
+    var status = (t[ix.status]||"").trim();
+    var closed = /closed/i.test(status);
+    var when = ("updated" in ix) ? parseUpdated(t[ix.updated]) : null;
+    var dow, hour;
+    if(when){ dow = when.dow; hour = when.hour; }
+    else {
+      var dn = (t[ix.day_of_week]||"").trim();
+      dow = DAYS.indexOf(dn);
+      hour = parseInt(t[ix.hour],10);
+      if(dow < 0 || isNaN(hour)) continue;
+    }
+    if(isNaN(count)) count = 0;
+    if(!facMap[fac]) facMap[fac] = { name:fac, cap: isNaN(cap)?0:cap, latest:null };
+    if(!isNaN(cap) && cap > facMap[fac].cap) facMap[fac].cap = cap;
+    var rec = { fac:fac, dow:dow, hour:hour, count:count, closed:closed, date: when?when.date:null };
+    if(when && (!facMap[fac].latest || when.date > facMap[fac].latest.date)) facMap[fac].latest = rec;
+    out.push(rec);
+  }
+  if(!out.length) throw new Error("No readings could be read out of that file.");
+
+  rows = out;
+  facilities = Object.keys(facMap).sort().map(function(k){
+    var f = facMap[k];
+    f.short = f.name.replace(/\s*-\s*Fitness Center\s*$/i,"").trim() || f.name;
+    return f;
+  });
+  build();
+}
+
+function build(){
+  buckets = {}; maxAvg = 1;
+  facilities.forEach(function(f){
+    var g = buckets[f.name] = [];
+    for(var d=0;d<7;d++){ g.push(new Array(24).fill(null)); }
+  });
+  rows.forEach(function(r){
+    var g = buckets[r.fac]; if(!g) return;
+    var b = g[r.dow][r.hour];
+    if(!b){ b = g[r.dow][r.hour] = {sum:0,n:0,min:Infinity,max:-Infinity,closed:0,open:0}; }
+    if(r.closed){ b.closed++; return; }
+    b.open++; b.sum += r.count; b.n++;
+    if(r.count < b.min) b.min = r.count;
+    if(r.count > b.max) b.max = r.count;
+  });
+  facilities.forEach(function(f){
+    buckets[f.name].forEach(function(day){
+      day.forEach(function(b){
+        if(b && b.n){ var a = b.sum/b.n; if(a > maxAvg) maxAvg = a; }
+      });
+    });
+  });
+}
+
+/* ---------- estimation ---------- */
+function estimate(fac, dow, hour){
+  var g = buckets[fac]; if(!g) return null;
+  var exact = g[dow][hour];
+  if(exact && exact.n >= 2) return { avg:exact.sum/exact.n, n:exact.n, min:exact.min, max:exact.max, tier:"exact", closed:exact.closed };
+  if(exact && exact.closed && !exact.open) return { closed:true, n:exact.closed, tier:"exact" };
+
+  // same kind of day (weekday vs weekend), same hour
+  var weekend = dow >= 5;
+  var sum=0,n=0,min=Infinity,max=-Infinity,cl=0;
+  for(var d=0;d<7;d++){
+    if((d>=5) !== weekend) continue;
+    var b = g[d][hour]; if(!b) continue;
+    sum += b.sum; n += b.n; cl += b.closed;
+    if(b.min < min) min = b.min;
+    if(b.max > max) max = b.max;
+  }
+  if(n >= 2) return { avg:sum/n, n:n, min:min, max:max, tier:weekend?"weekend":"weekday", closed:cl };
+  if(!n && cl) return { closed:true, n:cl, tier:weekend?"weekend":"weekday" };
+
+  // any day, same hour
+  sum=0;n=0;min=Infinity;max=-Infinity;cl=0;
+  for(d=0;d<7;d++){
+    var b2 = g[d][hour]; if(!b2) continue;
+    sum += b2.sum; n += b2.n; cl += b2.closed;
+    if(b2.min < min) min = b2.min;
+    if(b2.max > max) max = b2.max;
+  }
+  if(n >= 1) return { avg:sum/n, n:n, min:min, max:max, tier:"hour", closed:cl };
+  if(cl) return { closed:true, n:cl, tier:"hour" };
+  return null;
+}
+
+/* ---------- time ---------- */
+function pacific(){
+  var parts;
+  try{
+    parts = new Intl.DateTimeFormat("en-US",{
+      timeZone:"America/Los_Angeles", weekday:"short", month:"short", day:"numeric",
+      hour:"numeric", minute:"2-digit", hour12:true
+    }).formatToParts(new Date());
+  }catch(e){
+    var d = new Date();
+    return { dow:(d.getDay()+6)%7, hour:d.getHours(), label:d.toLocaleString() };
+  }
+  var p = {};
+  parts.forEach(function(x){ if(x.type!=="literal") p[x.type]=x.value; });
+  var h24;
+  try{
+    h24 = parseInt(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Los_Angeles",hour:"2-digit",hour12:false}).format(new Date()),10);
+  }catch(e){ h24 = new Date().getHours(); }
+  if(isNaN(h24)) h24 = 0;
+  var dow = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].indexOf(p.weekday);
+  if(dow < 0) dow = (new Date().getDay()+6)%7;
+  return { dow:dow, hour:h24, label:p.weekday+" "+p.day+" "+p.month+" · "+p.hour+":"+p.minute+" "+(p.dayPeriod||"") };
+}
+function hourLabel(h){
+  var ap = h<12 ? "AM" : "PM";
+  var hh = h%12; if(hh===0) hh=12;
+  return hh+" "+ap;
+}
+function ago(date){
+  if(!date) return "";
+  var mins = Math.round((Date.now()-date.getTime())/60000);
+  if(mins < 0) return "just now";
+  if(mins < 60) return mins+" min ago";
+  var hrs = Math.round(mins/60);
+  if(hrs < 36) return hrs+" hr ago";
+  return Math.round(hrs/24)+" days ago";
+}
+
+/* ---------- render ---------- */
+var el = {};
+["clock","freshness","empty","main","pools","days","hour","hourval","whenhead","nowbtn",
+ "heatmaps","ask","q","goask","answer","chips","pick","clear","file","paste","usepaste",
+ "status","datah"].forEach(function(id){ el[id] = document.getElementById(id); });
+
+function depthVar(avg, cap){
+  var pct = cap ? avg/cap : avg/maxAvg;
+  if(pct <= 0.001) return "--d1";
+  if(pct < 0.12) return "--d1";
+  if(pct < 0.25) return "--d2";
+  if(pct < 0.40) return "--d3";
+  if(pct < 0.58) return "--d4";
+  if(pct < 0.78) return "--d5";
+  return "--d6";
+}
+
+function renderClock(){
+  var p = pacific();
+  el.clock.innerHTML = p.label.trim().replace("·","<span>·</span>");
+}
+
+function renderPools(){
+  var dow = sel.day, hour = sel.hour;
+  el.pools.innerHTML = "";
+  facilities.forEach(function(f){
+    var est = estimate(f.name, dow, hour);
+    var div = document.createElement("div");
+    div.className = "pool";
+
+    var h = document.createElement("h2");
+    h.textContent = f.short;
+    if(f.cap){ var em = document.createElement("em"); em.textContent = "holds "+f.cap; h.appendChild(em); }
+    div.appendChild(h);
+
+    var big = document.createElement("div");
+    if(!est){
+      big.className = "count quiet";
+      big.textContent = "No reading yet";
+      div.appendChild(big);
+      var c0 = document.createElement("div");
+      c0.className = "conf";
+      c0.textContent = "Nothing recorded at this hour so far.";
+      div.appendChild(c0);
+      el.pools.appendChild(div);
+      return;
+    }
+    if(est.closed){
+      big.className = "count quiet";
+      big.textContent = "Closed";
+      div.appendChild(big);
+      var c1 = document.createElement("div");
+      c1.className = "conf";
+      c1.textContent = "Every reading at this hour had it shut ("+est.n+").";
+      div.appendChild(c1);
+      el.pools.appendChild(div);
+      return;
+    }
+
+    var avg = Math.round(est.avg);
+    big.className = "count";
+    big.textContent = avg;
+    div.appendChild(big);
+
+    var cap = document.createElement("div");
+    cap.className = "cap";
+    cap.textContent = f.cap ? "of "+f.cap+" people" : "people";
+    div.appendChild(cap);
+
+    var pct = f.cap ? Math.min(100, Math.round(avg/f.cap*100)) : null;
+    var g = document.createElement("div");
+    g.className = "gauge";
+    var fill = document.createElement("i");
+    fill.style.background = "var("+depthVar(est.avg, f.cap)+")";
+    g.appendChild(fill);
+    div.appendChild(g);
+    requestAnimationFrame(function(){ fill.style.width = (pct===null?Math.min(100,avg/maxAvg*100):pct)+"%"; });
+
+    var row = document.createElement("div");
+    row.className = "gaugerow";
+    var left = document.createElement("span");
+    left.textContent = pct===null ? "" : pct+"% full";
+    var right = document.createElement("span");
+    right.textContent = (est.min===est.max) ? "" : "seen "+est.min+"–"+est.max;
+    row.appendChild(left); row.appendChild(right);
+    div.appendChild(row);
+
+    div.appendChild(sparkline(f, dow, hour));
+
+    var conf = document.createElement("div");
+    conf.className = "conf";
+    var tier = est.tier;
+    var src;
+    if(tier === "exact") src = "From "+est.n+" reading"+(est.n===1?"":"s")+" at "+DAYS[dow]+" "+hourLabel(hour)+".";
+    else if(tier === "weekday") src = "Thin data for "+DAYS[dow]+" — averaged across weekdays at "+hourLabel(hour)+" ("+est.n+" readings).";
+    else if(tier === "weekend") src = "Thin data for "+DAYS[dow]+" — averaged across the weekend at "+hourLabel(hour)+" ("+est.n+" readings).";
+    else src = "Thin data — averaged across every day at "+hourLabel(hour)+" ("+est.n+" readings).";
+    if(est.n < 3) src += " Treat this as a rough guess.";
+    conf.textContent = src;
+    div.appendChild(conf);
+
+    el.pools.appendChild(div);
+  });
+}
+
+function sparkline(f, dow, hour){
+  var svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("class","spark");
+  svg.setAttribute("viewBox","0 0 240 46");
+  svg.setAttribute("preserveAspectRatio","none");
+  svg.setAttribute("aria-hidden","true");
+  var vals = [], any = false;
+  for(var h=0;h<24;h++){
+    var e = estimate(f.name, dow, h);
+    var v = (e && !e.closed && e.tier === "exact") ? e.avg : null;
+    if(v !== null) any = true;
+    vals.push(v);
+  }
+  if(!any){
+    for(h=0;h<24;h++){
+      var e2 = estimate(f.name, dow, h);
+      vals[h] = (e2 && !e2.closed) ? e2.avg : null;
+      if(vals[h] !== null) any = true;
+    }
+  }
+  var top = f.cap || maxAvg;
+  var X = function(i){ return i/23*236 + 2; };
+  var Y = function(v){ return 42 - Math.min(1, v/top)*38; };
+
+  // baseline
+  var base = document.createElementNS("http://www.w3.org/2000/svg","line");
+  base.setAttribute("x1","0"); base.setAttribute("x2","240");
+  base.setAttribute("y1","43"); base.setAttribute("y2","43");
+  base.setAttribute("stroke","var(--rule-soft)"); base.setAttribute("stroke-width","1");
+  svg.appendChild(base);
+
+  if(any){
+    var segs = [], cur = [];
+    vals.forEach(function(v,i){
+      if(v === null){ if(cur.length) segs.push(cur); cur = []; }
+      else cur.push([i,v]);
+    });
+    if(cur.length) segs.push(cur);
+    segs.forEach(function(s){
+      if(s.length === 1){
+        var dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+        dot.setAttribute("cx",X(s[0][0])); dot.setAttribute("cy",Y(s[0][1]));
+        dot.setAttribute("r","2.2"); dot.setAttribute("fill","var(--d4)");
+        svg.appendChild(dot); return;
+      }
+      var dAttr = "M "+X(s[0][0])+" "+Y(s[0][1]);
+      for(var i=1;i<s.length;i++) dAttr += " L "+X(s[i][0])+" "+Y(s[i][1]);
+      var area = document.createElementNS("http://www.w3.org/2000/svg","path");
+      area.setAttribute("d", dAttr+" L "+X(s[s.length-1][0])+" 43 L "+X(s[0][0])+" 43 Z");
+      area.setAttribute("fill","var(--d2)"); area.setAttribute("opacity","0.5");
+      svg.appendChild(area);
+      var line = document.createElementNS("http://www.w3.org/2000/svg","path");
+      line.setAttribute("d", dAttr);
+      line.setAttribute("fill","none"); line.setAttribute("stroke","var(--d4)");
+      line.setAttribute("stroke-width","1.8"); line.setAttribute("stroke-linejoin","round");
+      svg.appendChild(line);
+    });
+  }
+
+  var mark = document.createElementNS("http://www.w3.org/2000/svg","line");
+  mark.setAttribute("x1",X(hour)); mark.setAttribute("x2",X(hour));
+  mark.setAttribute("y1","0"); mark.setAttribute("y2","43");
+  mark.setAttribute("stroke","var(--signal)"); mark.setAttribute("stroke-width","1.6");
+  svg.appendChild(mark);
+  return svg;
+}
+
+function renderDays(){
+  el.days.innerHTML = "";
+  DAYS_SHORT.forEach(function(d,i){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = d;
+    b.setAttribute("aria-pressed", String(i === sel.day));
+    b.addEventListener("click", function(){ sel.day = i; sel.pinned = true; render(); });
+    el.days.appendChild(b);
+  });
+}
+
+function renderWhen(){
+  var now = pacific();
+  var isNow = !sel.pinned && sel.day === now.dow && sel.hour === now.hour;
+  el.whenhead.textContent = isNow
+    ? "Estimating for right now"
+    : "Estimating for "+DAYS[sel.day]+" at "+hourLabel(sel.hour);
+  el.nowbtn.setAttribute("aria-pressed", String(isNow));
+  el.nowbtn.classList.toggle("hidden", isNow);
+  el.hour.value = sel.hour;
+  el.hourval.textContent = hourLabel(sel.hour);
+}
+
+function renderHeat(){
+  var now = pacific();
+  el.heatmaps.innerHTML = "";
+  facilities.forEach(function(f){
+    var wrap = document.createElement("div");
+    wrap.className = "grid";
+    var name = document.createElement("div");
+    name.className = "gridname";
+    name.textContent = f.short;
+    wrap.appendChild(name);
+
+    var scroll = document.createElement("div");
+    scroll.className = "gridscroll";
+    var table = document.createElement("table");
+    table.className = "heat";
+
+    var thead = document.createElement("tr");
+    thead.appendChild(document.createElement("th"));
+    for(var h=0;h<24;h++){
+      var th = document.createElement("th");
+      th.textContent = (h%3===0) ? (h%12===0?12:h%12)+(h<12?"a":"p") : "";
+      thead.appendChild(th);
+    }
+    table.appendChild(thead);
+
+    for(var d=0;d<7;d++){
+      var tr = document.createElement("tr");
+      var rh = document.createElement("th");
+      rh.className = "rowh";
+      rh.textContent = DAYS_SHORT[d];
+      tr.appendChild(rh);
+      for(h=0;h<24;h++){
+        var td = document.createElement("td");
+        var b = buckets[f.name][d][h];
+        if(b && b.n){
+          var avg = b.sum/b.n;
+          td.className = "has";
+          td.style.background = "var("+depthVar(avg, f.cap)+")";
+          td.title = DAYS[d]+" "+hourLabel(h)+" — about "+Math.round(avg)+" people"+
+            (b.n>1?" (avg of "+b.n+")":"");
+        } else if(b && b.closed){
+          td.style.background = "var(--closed)";
+          td.title = DAYS[d]+" "+hourLabel(h)+" — closed";
+        }
+        if(d === now.dow && h === now.hour) td.className += " now";
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    scroll.appendChild(table);
+    wrap.appendChild(scroll);
+    el.heatmaps.appendChild(wrap);
+  });
+}
+
+function renderFreshness(){
+  var bits = [];
+  facilities.forEach(function(f){
+    if(f.latest) bits.push(f.short+" "+f.latest.count+" · "+ago(f.latest.date));
+  });
+  el.freshness.innerHTML = bits.length
+    ? "Last seen — <b>"+bits.join("</b>  ·  <b>")+"</b>"
+    : rows.length+" readings loaded";
+}
+
+function render(){
+  renderClock();
+  renderPools();
+  renderDays();
+  renderWhen();
+  renderHeat();
+  renderFreshness();
+}
+
+/* ---------- data flow ---------- */
+function say(msg, bad){
+  el.status.textContent = msg || "";
+  el.status.className = "status" + (bad ? " bad" : "");
+}
+
+function load(text, remember){
+  try{
+    ingest(text);
+  }catch(e){
+    say(e.message || "That file couldn't be read.", true);
+    return false;
+  }
+  if(remember !== false) store(text);
+  lastLoaded = text;
+  var now = pacific();
+  if(sel.day === null){ sel.day = now.dow; sel.hour = now.hour; }
+  el.empty.classList.add("hidden");
+  el.main.classList.remove("hidden");
+  el.clear.classList.remove("hidden");
+  el.pick.textContent = "Load a newer counts.csv";
+  el.pick.classList.remove("primary");
+  el.datah.textContent = "Your data";
+  say(rows.length+" readings across "+facilities.length+" facilit"+(facilities.length===1?"y":"ies")+".");
+  render();
+  return true;
+}
+
+el.pick.addEventListener("click", function(){ el.file.click(); });
+el.file.addEventListener("change", function(){
+  var f = el.file.files && el.file.files[0];
+  if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ load(String(fr.result)); };
+  fr.onerror = function(){ say("Couldn't read that file.", true); };
+  fr.readAsText(f);
+  el.file.value = "";
+});
+el.usepaste.addEventListener("click", function(){
+  var t = el.paste.value.trim();
+  if(!t){ say("Paste the contents of counts.csv first.", true); return; }
+  if(load(t)) el.paste.value = "";
+});
+el.clear.addEventListener("click", function(){
+  forget();
+  rows = []; facilities = []; buckets = {}; sel = {day:null,hour:null,pinned:false};
+  el.main.classList.add("hidden");
+  el.empty.classList.remove("hidden");
+  el.clear.classList.add("hidden");
+  el.pick.textContent = "Choose counts.csv";
+  el.pick.classList.add("primary");
+  el.datah.textContent = "Load your data";
+  el.freshness.textContent = "";
+  say("Cleared. Load a file to start again.");
+});
+
+el.hour.addEventListener("input", function(){
+  sel.hour = parseInt(el.hour.value,10);
+  sel.pinned = true;
+  renderPools(); renderWhen();
+});
+el.nowbtn.addEventListener("click", function(){
+  var n = pacific();
+  sel.day = n.dow; sel.hour = n.hour; sel.pinned = false;
+  render();
+});
+
+/* ---------- ask ---------- */
+function summary(){
+  var lines = [];
+  lines.push("Facilities and capacity:");
+  facilities.forEach(function(f){
+    lines.push("- "+f.name+" (capacity "+(f.cap||"unknown")+")");
+    if(f.latest) lines.push("  most recent reading: "+f.latest.count+" people, "+DAYS[f.latest.dow]+" "+hourLabel(f.latest.hour));
+  });
+  lines.push("");
+  lines.push("Average people counted, by day and hour (hours with no reading are omitted):");
+  facilities.forEach(function(f){
+    lines.push(f.short+":");
+    for(var d=0;d<7;d++){
+      var parts = [];
+      for(var h=0;h<24;h++){
+        var b = buckets[f.name][d][h];
+        if(b && b.n) parts.push(hourLabel(h)+"="+Math.round(b.sum/b.n)+"(n"+b.n+")");
+        else if(b && b.closed) parts.push(hourLabel(h)+"=closed");
+      }
+      if(parts.length) lines.push("  "+DAYS[d]+": "+parts.join(", "));
+    }
+  });
+  var n = pacific();
+  lines.push("");
+  lines.push("Right now it is "+DAYS[n.dow]+" "+hourLabel(n.hour)+" Pacific.");
+  lines.push("The person is currently looking at an estimate for "+DAYS[sel.day]+" "+hourLabel(sel.hour)+".");
+  return lines.join("\n");
+}
+
+var sampleFn = null;
+var asking = false;
+var CHIPS = ["Estimate current facility counts","When is AOERC quietest?","Is it worth going now or waiting an hour?"];
+
+function setupAsk(){
+  if(!sampleFn) return;
+  el.ask.classList.remove("hidden");
+  CHIPS.forEach(function(c){
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = c;
+    b.addEventListener("click", function(){ el.q.value = c; ask(); });
+    el.chips.appendChild(b);
+  });
+}
+
+function ask(){
+  if(asking || !sampleFn) return;
+  var q = el.q.value.trim();
+  if(!q){ el.q.focus(); return; }
+  if(!rows.length){ el.answer.textContent = "Load counts.csv first — there's nothing to read yet."; return; }
+  asking = true;
+  el.goask.disabled = true;
+  el.answer.textContent = "Thinking…";
+  var prompt =
+    "You are reading occupancy data from two Stanford fitness centers, collected by a turnstile-count tracker. "+
+    "Answer the question using only the figures below. These are averages from a small sample, so be honest about "+
+    "how shaky an answer is when a cell has few readings (the n value). Give numbers, keep it to a few sentences, "+
+    "no preamble.\n\n"+summary()+"\n\nQuestion: "+q;
+  sampleFn(prompt, {
+    modelTier:"quick",
+    onText:function(o){ el.answer.textContent = o.text; }
+  }).then(function(res){
+    el.answer.textContent = res.text;
+  }).catch(function(e){
+    var code = e && e.code;
+    if(code === "not_granted" || code === "sampling_disabled" || code === "not_declared" || code === "capability_disabled"){
+      el.ask.classList.add("hidden");
+    } else if(code === "rate_limited"){
+      el.answer.textContent = "Too many questions at once. Give it a minute.";
+    } else if(code === "cancelled"){
+      el.answer.textContent = "";
+    } else {
+      el.answer.textContent = (e && e.text) || "That didn't go through. Try again.";
+    }
+  }).then(function(){
+    asking = false;
+    el.goask.disabled = false;
+  });
+}
+el.goask.addEventListener("click", ask);
+el.q.addEventListener("keydown", function(e){ if(e.key === "Enter") ask(); });
+
+/* ---------- boot ---------- */
+renderClock();
+setInterval(function(){
+  renderClock();
+  if(!sel.pinned && rows.length){
+    var n = pacific();
+    if(n.dow !== sel.day || n.hour !== sel.hour){ sel.day=n.dow; sel.hour=n.hour; render(); }
+    else renderFreshness();
+  }
+}, 60000);
+
+var saved = restore();
+if(saved){
+  if(load(saved.csv, false)){
+    var days = Math.round((Date.now()-saved.at)/86400000);
+    if(days >= 1) say(rows.length+" readings, loaded "+(days===1?"yesterday":days+" days ago")+". Load a newer file to catch up.");
+  }
+}
+
+if(window.claude && typeof window.claude.use === "function"){
+  window.claude.use("sample").then(function(s){
+    if(s){ sampleFn = s; setupAsk(); }
+  }).catch(function(){});
+}
+
+})();
+</script>
+</body>
+</html>
