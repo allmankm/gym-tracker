@@ -1,0 +1,67 @@
+name: Scrape gym counts
+
+on:
+  schedule:
+    # Every 15 minutes. GitHub interprets cron in UTC, but the script handles
+    # its own Pacific conversion so this is just "4x per hour".
+    - cron: "*/15 * * * *"
+  workflow_dispatch:   # lets you run it by hand from the Actions tab
+
+# Allow the job to push the updated CSV back to the repo.
+permissions:
+  contents: write
+
+# If a run is still going when the next one fires, let it finish rather than
+# having two jobs commit at once.
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run the scraper
+        run: python scrape.py
+
+      - name: Commit the CSV if it changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Stage first: on the very first run the CSV is untracked, and plain
+          # `git diff` ignores untracked files. Staging makes both the
+          # brand-new-file and the appended-rows cases show up the same way.
+          git add data/counts.csv
+
+          # --quiet exits non-zero when there ARE staged changes.
+          if git diff --cached --quiet -- data/counts.csv; then
+            echo "No change to data/counts.csv -- nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Update gym counts ($(TZ=America/Los_Angeles date '+%Y-%m-%d %H:%M %Z'))"
+
+          # Another scheduled run may have pushed while we were working.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected; rebasing on origin and retrying..."
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+
+          echo "Could not push after 3 attempts." >&2
+          exit 1

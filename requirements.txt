@@ -1,0 +1,4 @@
+requests>=2.31
+# Ships the IANA timezone database so ZoneInfo("America/Los_Angeles") resolves
+# even on minimal runners that have no system tzdata.
+tzdata>=2024.1
