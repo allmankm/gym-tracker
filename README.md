@@ -3,6 +3,23 @@
 Logs how busy two Stanford fitness centers are, every 15 minutes, into a CSV —
 so you can work out when they're actually quiet.
 
+**Dashboard: https://allmankm.github.io/gym-tracker/**
+
+The dashboard (`index.html`) is served by GitHub Pages from this repo's root.
+It loads `data/counts.csv` over the network on page load, so there's nothing to
+upload by hand; the manual file picker is still there, tucked under *Load a file
+by hand*, for when you open the file straight off disk. The last good CSV is
+kept in `localStorage` and used if the fetch fails.
+
+It also calls the goboard JSON API directly for the **live** count, shown above
+the historical estimate with its own timestamp. That works because the API sends
+`Access-Control-Allow-Origin: *` — verified with a real GET, since the endpoint
+rejects `HEAD` with a 405 before any CORS headers are applied.
+
+Note that GitHub serves Pages through a CDN that caches for a few minutes, so a
+row the scraper just committed can take a little while to show up. The page says
+as much in its freshness line.
+
 Tracked facilities:
 
 - **AOERC - Fitness Center** (capacity 150)

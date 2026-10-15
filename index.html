@@ -235,6 +235,16 @@ details.paste summary{cursor:pointer;font-size:13px;color:var(--ink-soft);paddin
 details.paste summary:hover{color:var(--ink)}
 details.paste > div{margin-top:10px}
 .hidden{display:none !important}
+.live{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09)}
+.live .lbl{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.65}
+.live .dot{width:6px;height:6px;border-radius:50%;background:var(--d5);flex:0 0 auto}
+.live .now{margin-top:4px;font-size:25px;font-weight:650;line-height:1.1}
+.live .now span{font-size:13px;font-weight:450;opacity:.6;margin-left:5px}
+.live .when{margin-top:2px;font-size:11.5px;opacity:.55}
+.live.shut .dot{background:var(--d1)}
+.live.shut .now{font-size:19px;opacity:.75}
+.estlbl{font-size:11px;letter-spacing:.09em;text-transform:uppercase;opacity:.5;margin-bottom:3px}
+.freshness .warn{opacity:.75}
 :focus-visible{outline:2px solid var(--d4);outline-offset:2px}
 @media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
 </style>
@@ -250,10 +260,10 @@ details.paste > div{margin-top:10px}
   <!-- empty state -->
   <section class="empty" id="empty">
     <h1>How deep is<br>the crowd?</h1>
-    <p>This reads the history your tracker has been collecting and estimates how many people are in each fitness center at a given hour. It can't reach GitHub on its own, so hand it the file once and it'll remember.</p>
-    <ol class="steps">
-      <li><span class="n">1</span><span>Open <a href="https://raw.githubusercontent.com/allmankm/gym-tracker/main/data/counts.csv" target="_blank" rel="noopener">counts.csv</a> and save it, or select all and copy.</span></li>
-      <li><span class="n">2</span><span>Load it below. It stays in this browser, so next time the page opens straight to the estimate.</span></li>
+    <p id="emptymsg">Reading the history your tracker has been collecting…</p>
+    <ol class="steps hidden" id="emptysteps">
+      <li><span class="n">1</span><span>The reading didn't load on its own. Open <a href="https://raw.githubusercontent.com/allmankm/gym-tracker/main/data/counts.csv" target="_blank" rel="noopener">counts.csv</a> and save it, or select all and copy.</span></li>
+      <li><span class="n">2</span><span>Open <b>Load a file by hand</b> at the bottom of the page and hand it over.</span></li>
     </ol>
   </section>
 
@@ -301,16 +311,20 @@ details.paste > div{margin-top:10px}
 
   <!-- data panel -->
   <section class="data">
-    <h3 id="datah">Load your data</h3>
-    <p class="hint">Pull a fresh copy of <a href="https://raw.githubusercontent.com/allmankm/gym-tracker/main/data/counts.csv" target="_blank" rel="noopener">counts.csv</a> whenever you want the estimate to include recent readings.</p>
+    <h3 id="datah">Data</h3>
+    <p class="hint" id="datahint">Loading <code>data/counts.csv</code> from this site automatically.</p>
     <div class="drop">
-      <button class="filebtn primary" id="pick">Choose counts.csv</button>
-      <button class="filebtn hidden" id="clear">Forget this data</button>
+      <button class="filebtn primary" id="reload">Check for new readings</button>
+      <button class="filebtn hidden" id="clear">Forget saved copy</button>
     </div>
-    <input type="file" id="file" accept=".csv,text/csv" class="hidden">
     <details class="paste">
-      <summary>or paste the file contents</summary>
+      <summary>Load a file by hand</summary>
       <div>
+        <p class="hint" style="margin:0 0 10px">Only needed if the automatic load above fails — for instance when opening this file straight off disk.</p>
+        <div class="drop" style="margin-bottom:10px">
+          <button class="filebtn" id="pick">Choose counts.csv</button>
+        </div>
+        <input type="file" id="file" accept=".csv,text/csv" class="hidden">
         <textarea id="paste" placeholder="checked_at,day_of_week,hour,facility,status,last_count,…" spellcheck="false"></textarea>
         <div style="margin-top:10px"><button class="filebtn" id="usepaste">Use pasted data</button></div>
       </div>
@@ -328,12 +342,23 @@ var KEY = "gymdepth.csv.v1";
 var DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 var DAYS_SHORT = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+// History, committed by the scraper. Relative, so it works from any Pages path.
+var CSV_URL = "data/counts.csv";
+
+// The same JSON feed scrape.py reads. Verified to send
+// `Access-Control-Allow-Origin: *`, so the browser may call it directly.
+var API_URL = "https://goboardapi.azurewebsites.net/api/FacilityCount/GetCountsByAccount"
+            + "?AccountAPIKey=9f320719-e415-46d7-b233-a89d85ba6d97";
+
 var rows = [];        // parsed readings
 var facilities = [];  // {name, short, capacity}
 var buckets = {};     // facility -> dow -> hour -> {sum,n,min,max,closed,open}
 var maxAvg = 1;
 var sel = { day: null, hour: null, pinned: false };
 var lastLoaded = null;
+var live = null;      // facility name -> current reading, or null if unavailable
+var liveFailed = false;
+var fromNetwork = false;  // true once the CSV came off the network, not cache
 
 /* ---------- storage ---------- */
 function store(text){
@@ -526,7 +551,7 @@ function ago(date){
 var el = {};
 ["clock","freshness","empty","main","pools","days","hour","hourval","whenhead","nowbtn",
  "heatmaps","ask","q","goask","answer","chips","pick","clear","file","paste","usepaste",
- "status","datah"].forEach(function(id){ el[id] = document.getElementById(id); });
+ "status","datah","datahint","reload","emptymsg","emptysteps"].forEach(function(id){ el[id] = document.getElementById(id); });
 
 function depthVar(avg, cap){
   var pct = cap ? avg/cap : avg/maxAvg;
@@ -544,6 +569,39 @@ function renderClock(){
   el.clock.innerHTML = p.label.trim().replace("·","<span>·</span>");
 }
 
+function liveBlock(lv){
+  var box = document.createElement("div");
+  box.className = "live" + (lv.closed ? " shut" : "");
+
+  var lbl = document.createElement("div");
+  lbl.className = "lbl";
+  var dot = document.createElement("span"); dot.className = "dot";
+  lbl.appendChild(dot);
+  lbl.appendChild(document.createTextNode("Live now"));
+  box.appendChild(lbl);
+
+  var now = document.createElement("div");
+  now.className = "now";
+  if(lv.closed){
+    now.textContent = "Closed";
+  } else {
+    now.textContent = String(lv.count);
+    var s = document.createElement("span");
+    s.textContent = "in right now" + (lv.pct === null ? "" : " · "+lv.pct+"% full");
+    now.appendChild(s);
+  }
+  box.appendChild(now);
+
+  var when = document.createElement("div");
+  when.className = "when";
+  when.textContent = lv.label
+    ? "Counter updated "+lv.label+(lv.date ? " · "+ago(lv.date) : "")
+    : "Timestamp unavailable";
+  box.appendChild(when);
+
+  return box;
+}
+
 function renderPools(){
   var dow = sel.day, hour = sel.hour;
   el.pools.innerHTML = "";
@@ -556,6 +614,15 @@ function renderPools(){
     h.textContent = f.short;
     if(f.cap){ var em = document.createElement("em"); em.textContent = "holds "+f.cap; h.appendChild(em); }
     div.appendChild(h);
+
+    // The actual turnstile reading right now, above the historical estimate.
+    var lv = live && live[f.name];
+    if(lv) div.appendChild(liveBlock(lv));
+
+    var elbl = document.createElement("div");
+    elbl.className = "estlbl";
+    elbl.textContent = "Typical · "+DAYS_SHORT[dow]+" "+hourLabel(hour);
+    div.appendChild(elbl);
 
     var big = document.createElement("div");
     if(!est){
@@ -773,14 +840,36 @@ function renderHeat(){
   });
 }
 
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
 function renderFreshness(){
-  var bits = [];
-  facilities.forEach(function(f){
-    if(f.latest) bits.push(f.short+" "+f.latest.count+" · "+ago(f.latest.date));
-  });
-  el.freshness.innerHTML = bits.length
-    ? "Last seen — <b>"+bits.join("</b>  ·  <b>")+"</b>"
-    : rows.length+" readings loaded";
+  var head;
+  if(live){
+    // Prefer the live figures when we have them; they're newer than the CSV.
+    var now = [];
+    facilities.forEach(function(f){
+      var lv = live[f.name];
+      if(lv) now.push(esc(f.short)+" "+(lv.closed ? "closed" : lv.count+" now"));
+    });
+    head = now.length ? "Live — <b>"+now.join("</b> · <b>")+"</b>" : "";
+  }
+  if(!head){
+    var bits = [];
+    facilities.forEach(function(f){
+      if(f.latest) bits.push(esc(f.short)+" "+f.latest.count+" · "+ago(f.latest.date));
+    });
+    head = bits.length
+      ? "Last seen — <b>"+bits.join("</b>  ·  <b>")+"</b>"
+      : rows.length+" readings loaded";
+  }
+
+  var notes = [];
+  if(liveFailed) notes.push("live reading unavailable");
+  // GitHub puts Pages behind a CDN, so a just-committed row can take a few
+  // minutes to reach us. Say so rather than implying the history is instant.
+  if(fromNetwork) notes.push("history is CDN-cached, so it can trail the repo by a few minutes");
+
+  el.freshness.innerHTML = head + (notes.length ? " <span class=\"warn\">· "+notes.join(" · ")+"</span>" : "");
 }
 
 function render(){
@@ -812,9 +901,6 @@ function load(text, remember){
   el.empty.classList.add("hidden");
   el.main.classList.remove("hidden");
   el.clear.classList.remove("hidden");
-  el.pick.textContent = "Load a newer counts.csv";
-  el.pick.classList.remove("primary");
-  el.datah.textContent = "Your data";
   say(rows.length+" readings across "+facilities.length+" facilit"+(facilities.length===1?"y":"ies")+".");
   render();
   return true;
@@ -836,16 +922,22 @@ el.usepaste.addEventListener("click", function(){
   if(load(t)) el.paste.value = "";
 });
 el.clear.addEventListener("click", function(){
+  // The browser copy is only a fallback now, so dropping it means going
+  // straight back to the network rather than to an empty page.
   forget();
-  rows = []; facilities = []; buckets = {}; sel = {day:null,hour:null,pinned:false};
-  el.main.classList.add("hidden");
-  el.empty.classList.remove("hidden");
-  el.clear.classList.add("hidden");
-  el.pick.textContent = "Choose counts.csv";
-  el.pick.classList.add("primary");
-  el.datah.textContent = "Load your data";
-  el.freshness.textContent = "";
-  say("Cleared. Load a file to start again.");
+  lastLoaded = null;
+  say("Saved copy forgotten. Reloading from the site…");
+  fetchCSV().then(function(ok){
+    if(!ok) say("Couldn't reach data/counts.csv just now.", true);
+  });
+});
+
+el.reload.addEventListener("click", function(){
+  say("Checking for new readings…");
+  fetchLive();
+  fetchCSV().then(function(ok){
+    if(!ok) say("Couldn't reach data/counts.csv just now.", true);
+  });
 });
 
 el.hour.addEventListener("input", function(){
@@ -940,6 +1032,77 @@ function ask(){
 el.goask.addEventListener("click", ask);
 el.q.addEventListener("keydown", function(e){ if(e.key === "Enter") ask(); });
 
+/* ---------- network ---------- */
+
+/* The API stamp has no timezone, so like the widget itself we read it as a
+   Pacific wall-clock reading. Built as a local Date for consistency with
+   parseUpdated(), which the CSV path already uses. */
+function parseApiStamp(s){
+  var m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(s||"").trim());
+  if(!m) return null;
+  var h = parseInt(m[4],10), mi = parseInt(m[5],10);
+  var date = new Date(parseInt(m[1],10), parseInt(m[2],10)-1, parseInt(m[3],10), h, mi);
+  if(isNaN(date.getTime())) return null;
+  var hh = h % 12; if(hh === 0) hh = 12;
+  return { date:date, label: hh+":"+("0"+mi).slice(-2)+" "+(h<12?"AM":"PM") };
+}
+
+/* Mirrors the widget's own maths: it ignores the API's PercetageCapacity
+   field (always 0) and divides the count by capacity itself. */
+function liveFromApi(data){
+  var out = {}, n = 0;
+  data.forEach(function(loc){
+    if(!loc || !loc.LocationName) return;
+    var closed = !!loc.IsClosed;
+    var count = parseInt(loc.LastCount,10); if(isNaN(count)) count = 0;
+    var cap = parseInt(loc.TotalCapacity,10); if(isNaN(cap)) cap = 0;
+    var when = parseApiStamp(loc.LastUpdatedDateAndTime);
+    out[loc.LocationName] = {
+      count: closed ? 0 : count,
+      cap: cap,
+      closed: closed,
+      pct: (!closed && cap) ? Math.min(100, Math.round(count/cap*100)) : null,
+      label: when ? when.label : "",
+      date: when ? when.date : null
+    };
+    n++;
+  });
+  return n ? out : null;
+}
+
+function fetchCSV(){
+  if(typeof fetch !== "function") return Promise.resolve(false);
+  return fetch(CSV_URL+"?t="+Date.now(), {cache:"no-store"})
+    .then(function(r){
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return r.text();
+    })
+    .then(function(text){
+      // A 404 on Pages returns an HTML page with status 200 in some setups.
+      if(!/facility/i.test(text)) throw new Error("that isn't counts.csv");
+      fromNetwork = true;
+      if(text === lastLoaded){ render(); return true; }
+      return load(text);
+    })
+    .catch(function(){ return false; });
+}
+
+function fetchLive(){
+  if(typeof fetch !== "function"){ liveFailed = true; return Promise.resolve(); }
+  return fetch(API_URL, {cache:"no-store"})
+    .then(function(r){
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      return r.json();
+    })
+    .then(function(data){
+      if(!Array.isArray(data)) throw new Error("unexpected payload");
+      live = liveFromApi(data);
+      liveFailed = !live;
+    })
+    .catch(function(){ live = null; liveFailed = true; })
+    .then(function(){ if(rows.length){ renderPools(); renderFreshness(); } });
+}
+
 /* ---------- boot ---------- */
 renderClock();
 setInterval(function(){
@@ -951,13 +1114,30 @@ setInterval(function(){
   }
 }, 60000);
 
+// Paint the cached copy first so the page isn't blank during the fetch, then
+// let the network result replace it.
 var saved = restore();
-if(saved){
-  if(load(saved.csv, false)){
-    var days = Math.round((Date.now()-saved.at)/86400000);
-    if(days >= 1) say(rows.length+" readings, loaded "+(days===1?"yesterday":days+" days ago")+". Load a newer file to catch up.");
+if(saved) load(saved.csv, false);
+
+fetchCSV().then(function(ok){
+  if(ok){
+    el.datahint.innerHTML = "Read automatically from <code>data/counts.csv</code> on this site.";
+    return;
   }
-}
+  if(saved){
+    el.datahint.textContent = "Couldn't reach data/counts.csv — showing the copy saved in this browser.";
+    say("Couldn't reach data/counts.csv. Showing the copy saved in this browser.", true);
+  } else {
+    el.emptymsg.textContent = "Couldn't load data/counts.csv from this site.";
+    el.emptysteps.classList.remove("hidden");
+    el.datahint.textContent = "Automatic load failed.";
+    say("Couldn't reach data/counts.csv.", true);
+  }
+});
+
+// The turnstiles refresh every few minutes; re-check on the same rhythm.
+fetchLive();
+setInterval(fetchLive, 300000);
 
 if(window.claude && typeof window.claude.use === "function"){
   window.claude.use("sample").then(function(s){
