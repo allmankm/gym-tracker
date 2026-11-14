@@ -248,3 +248,4 @@ checked_at,day_of_week,hour,facility,status,last_count,percent_full,capacity,upd
 2026-11-13T17:32:25-08:00,Friday,17,AOERC - Fitness Center,Open,107,71,150,11/13/2026 05:04 PM,2026-11-13T17:04:16.57
 2026-11-13T20:19:21-08:00,Friday,20,AOERC - Fitness Center,Open,53,35,150,11/13/2026 07:31 PM,2026-11-13T19:31:56.357
 2026-11-13T21:16:36-08:00,Friday,21,AOERC - Fitness Center,Open,56,37,150,11/13/2026 08:42 PM,2026-11-13T20:42:32.64
+2026-11-14T05:29:43-08:00,Saturday,5,AOERC - Fitness Center,Open,62,41,150,11/13/2026 10:36 PM,2026-11-13T22:36:12.257
