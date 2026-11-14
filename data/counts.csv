@@ -245,3 +245,4 @@ checked_at,day_of_week,hour,facility,status,last_count,percent_full,capacity,upd
 2026-11-12T17:37:53-08:00,Thursday,17,ACSR - Fitness Center,Open,91,73,125,11/12/2026 05:15 PM,2026-11-12T17:15:58.813
 2026-11-13T06:41:52-08:00,Friday,6,AOERC - Fitness Center,Open,49,33,150,11/13/2026 06:40 AM,2026-11-13T06:40:54.843
 2026-11-13T07:28:13-08:00,Friday,7,AOERC - Fitness Center,Open,65,43,150,11/13/2026 07:23 AM,2026-11-13T07:23:21.09
+2026-11-13T17:32:25-08:00,Friday,17,AOERC - Fitness Center,Open,107,71,150,11/13/2026 05:04 PM,2026-11-13T17:04:16.57
